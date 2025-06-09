@@ -1,107 +1,37 @@
-{
-  "name": "line-job-bot",
-  "version": "1.0.0",
-  "description": "LINE Bot ส่ง Flex Message เมื่อพิมพ์ รับงาน",
-  "main": "index.js",
-  "scripts": {
-    "start": "node index.js"
-  },
-  "dependencies": {
-    "@line/bot-sdk": "^7.4.0",
-    "express": "^4.18.2"
-  }
-}
-# 54111
-line-job-bot
 const express = require('express');
-const { Client, middleware } = require('@line/bot-sdk');
-
-const config = {
-  channelAccessToken: process.env.CHANNEL_ACCESS_TOKEN,
-  channelSecret: process.env.CHANNEL_SECRET,
-};
+const line = require('@line/bot-sdk');
 
 const app = express();
-const client = new Client(config);
-const userCooldowns = new Map();
-const COOLDOWN_TIME = 5 * 60 * 1000; // 5 นาที
 
-app.post('/webhook', middleware(config), (req, res) => {
+// กำหนดค่าจากตัวแปรสภาพแวดล้อม (Environment Variables)
+const config = {
+  channelAccessToken: process.env.LINE_ACCESS_TOKEN,
+  channelSecret: process.env.LINE_CHANNEL_SECRET,
+};
+
+const client = new line.Client(config);
+
+// สร้าง webhook endpoint
+app.post('/webhook', line.middleware(config), (req, res) => {
   Promise.all(req.body.events.map(handleEvent))
-    .then(result => res.json(result))
-    .catch(err => {
-      console.error(err);
-      res.status(500).end();
-    });
+    .then(result => res.json(result));
 });
 
-async function handleEvent(event) {
+// ฟังก์ชันสำหรับตอบกลับข้อความ
+function handleEvent(event) {
   if (event.type !== 'message' || event.message.type !== 'text') {
-    return null;
+    return Promise.resolve(null);
   }
 
-  const userId = event.source.userId;
-  const text = event.message.text.trim();
-
-  if (text === 'รับงาน') {
-    const now = Date.now();
-    const lastSent = userCooldowns.get(userId) || 0;
-
-    if (now - lastSent < COOLDOWN_TIME) {
-      return client.replyMessage(event.replyToken, {
-        type: 'text',
-        text: 'กรุณารอสักครู่ก่อนส่งคำสั่งนี้อีกครั้งนะครับ'
-      });
-    }
-
-    userCooldowns.set(userId, now);
-
-    const flexMessage = {
-      type: 'flex',
-      altText: 'รายละเอียดงาน',
-      contents: {
-        type: 'bubble',
-        body: {
-          type: 'box',
-          layout: 'vertical',
-          contents: [
-            {
-              type: 'text',
-              text: 'รับงาน',
-              weight: 'bold',
-              size: 'xl',
-              margin: 'md'
-            },
-            {
-              type: 'text',
-              text: 'นี่คือรายละเอียดงานของคุณ',
-              wrap: true,
-              margin: 'md'
-            },
-            {
-              type: 'button',
-              action: {
-                type: 'uri',
-                label: 'ดูรายละเอียดเพิ่มเติม',
-                uri: 'https://your-site.example.com/job-detail'
-              },
-              margin: 'md'
-            }
-          ]
-        }
-      }
-    };
-
-    return client.replyMessage(event.replyToken, flexMessage);
-  }
-
+  // ตอบกลับข้อความที่ผู้ใช้พิมพ์
   return client.replyMessage(event.replyToken, {
     type: 'text',
-    text: 'พิมพ์ "รับงาน" เพื่อดูรายละเอียดงานครับ'
+    text: `คุณพิมพ์ว่า: ${event.message.text}`,
   });
 }
 
-const port = process.env.PORT || 3000;
-app.listen(port, () => {
-  console.log(`Server running on port ${port}`);
+// เริ่มเซิร์ฟเวอร์
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`กำลังฟังที่พอร์ต ${PORT}`);
 });
